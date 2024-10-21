@@ -2,6 +2,7 @@
 
     import javafx.fxml.FXML;
     import javafx.scene.control.Button;
+    import javafx.scene.control.Label;
     import javafx.scene.image.ImageView;
 
     import java.io.IOException;
@@ -11,8 +12,6 @@
         private ImageView FirstPlayer;
         @FXML
         private ImageView SecondPlayer;
-        @FXML
-        private Button RandomSlimeButton;
         @FXML
         private Button FightButton;
         @FXML
@@ -29,6 +28,16 @@
         private ImageView SecondPlayerLife2;
         @FXML
         private ImageView SecondPlayerLife3;
+        @FXML
+        private Label showAttribute;
+        @FXML
+        private Label showAttribute1;
+        @FXML
+        private Label boostedAttribute1;
+        @FXML
+        private Label boostedAttribute2;
+        @FXML
+        private Label ChoosenAttribute;
 
 
         @FXML
@@ -65,18 +74,23 @@
                 Fight();
             });
 
-            LuckButton.setOnAction(e -> {
+            /*LuckButton.setOnAction(e -> {
                 Luck();
-            });
+            });*/
         }
 
-        private void Luck() {
+
+
+        /*private void Luck() {
             // Seleccionar slime aleatorio
             int randomSlime = (int) (Math.random() * slimes.length);
             // Seleccionar atributo aleatorio
             int randomAtri = (int) (Math.random() * 3);
             // Seleccionar valores aleatorios
             int randomVal = (int) (Math.random() * 100) + 1;
+
+
+
 
             // Ajustar atributos
             switch (Atributos.values()[randomAtri]) {
@@ -90,11 +104,18 @@
                     slimes[randomSlime].setVelocidad(slimes[randomSlime].getVelocidad() + randomVal);
                     break;
             }
-        }
+        }*/
 
         private void Fight() {
             // Seleccionar atributo aleatorio
             int randomAtri= (int) (Math.random() * 3);
+            // Mostrar  el atributo elegido para la pelea
+            ChoosenAttribute.setText(Atributos.values()[randomAtri].toString());
+            // mostrar la suma del atributo elegido para la pelea de cada slime cada vez que se presiona el boton de pelea
+            boostedAttribute1.setText("+" + (slimes[0].getAtaque() + slimes[0].getDefensa() + slimes[0].getVelocidad()));
+            boostedAttribute2.setText("+" + (slimes[1].getAtaque() + slimes[1].getDefensa() + slimes[1].getVelocidad()));
+
+
             // Seleccionar valores aleatorios
             int randomVal = (int) (Math.random() * 100) + 1;
             int randomVal2 = (int) (Math.random() * 100) + 1;
@@ -117,6 +138,10 @@
             }
             // Manejar  vidas
             LifeVisibility(FirstWinPlayer);
+
+            // si un jugador se queda sin vidas se reinicia el juego
+
+
         }
 
         private void LifeVisibility(boolean FirstWinPlayer) {
@@ -141,16 +166,22 @@
 
         private void setRandomSlimes() {
             // Seleccionar dos slimes aleatorios
-            int randomSlime1 = (int) (Math.random() * slimes.length);
+            int randomSlime1 = (int) (Math.random() * slimes.length + Atributos.values().length);
             // Los slimes no pueden ser iguales
             int randomSlime2;
             do {
-                randomSlime2 = (int) (Math.random() * slimes.length);
+                randomSlime2 = (int) (Math.random() * slimes.length+ Atributos.values().length);
             } while (randomSlime1 == randomSlime2);
+
+            // Mostrar atributos
+            showAttribute(slimes[randomSlime1]);
+            showAttribute1(slimes[randomSlime2]);
+
 
             // Mostrar slimes
             FirstPlayer.setImage(slimes[randomSlime1].getImage());
             SecondPlayer.setImage(slimes[randomSlime2].getImage());
+
 
             // Ajustar tamaño
             FirstPlayer.setFitHeight(200);
@@ -158,4 +189,14 @@
             SecondPlayer.setFitHeight(200);
             SecondPlayer.setFitWidth(200);
         }
+
+        //añadir los atributos de los slimes escogidos
+        private void showAttribute(Slime slime){
+            showAttribute.setText("Ataque: " + slime.getAtaque() + "\n" + "Defensa: " + slime.getDefensa() + "\n" + "Velocidad: " + slime.getVelocidad());
+        }
+
+        private void showAttribute1(Slime slime) {
+            showAttribute1.setText("Ataque: " + slime.getAtaque() + "\n" + "Defensa: " + slime.getDefensa() + "\n" + "Velocidad: " + slime.getVelocidad());
+        }
+
     }
