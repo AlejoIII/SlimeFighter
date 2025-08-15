@@ -10,43 +10,83 @@ export default function BattleView({ state, onExit, onUpdate, mv, calcDamage, ty
   const [chat, setChat] = useState([]);
   const chatBoxRef = React.useRef(null);
   const [chatText, setChatText] = useState("");
+  const alertedRef = React.useRef(false);
 
   const doMove = async (who, moveId) => {
     if (state.winner || lockUI) return;
+    if (mode === 'online' && state.turn !== 'player') return; // solo en tu turno
     const me = who === "player" ? state.player : state.enemy;
     const other = who === "player" ? state.enemy : state.player;
 
     const move = mv(moveId);
     if (!move) return;
     // Precisión
+    // Trabajar sobre un borrador para no mutar estado prematuramente en online
+    const draft = {
+      ...state,
+      player: { ...state.player },
+      enemy: { ...state.enemy },
+      log: [...state.log]
+    };
+    const dMe = who === 'player' ? draft.player : draft.enemy;
+    const dOther = who === 'player' ? draft.enemy : draft.player;
+
     if (Math.random() * 100 > (move.accuracy || 100)) {
-      state.log.unshift(`${me.slime.name} falló ${move.name}.`);
+      draft.log.unshift(`${dMe.slime.name} falló ${move.name}.`);
     } else {
       if (move.power > 0) {
-        const dmg = calcDamage(me, other, move);
-        other.hp = Math.max(0, other.hp - dmg);
-        const eff = typeMultiplier(move.type, other.slime.types);
+        const dmg = calcDamage(dMe, dOther, move);
+        dOther.hp = Math.max(0, dOther.hp - dmg);
+        const eff = typeMultiplier(move.type, dOther.slime.types);
         const effTxt = eff > 1.4 ? " ¡Es súper eficaz!" : eff < 0.7 ? " No es muy eficaz…" : "";
-        state.log.unshift(`${me.slime.name} usa ${move.name} y causa ${dmg} daño.${effTxt}`);
+        draft.log.unshift(`${dMe.slime.name} usa ${move.name} y causa ${dmg} daño.${effTxt}`);
       }
       // Efecto
-      applyEffect(state, move.power === 0 ? me : other, move.effect);
+      applyEffect(draft, move.power === 0 ? dMe : dOther, move.effect);
     }
 
     // Check KO
-    if (other.hp <= 0) {
-      state.winner = who;
-      state.log.unshift(`${other.slime.name} queda fuera de combate.`);
-      onUpdate({ ...state });
+    if (dOther.hp <= 0) {
+      draft.winner = who;
+      draft.log.unshift(`${dOther.slime.name} queda fuera de combate.`);
+      if (mode === 'online' && roomId) {
+        const myId = state._ids?.player || youId;
+        const oppId = state._ids?.enemy || (players?.find(p => p.id !== myId)?.id);
+        try {
+          sendMove(roomId, moveId, {
+            log: draft.log.slice(0, 10),
+            hp: { [myId]: draft.player.hp, [oppId]: draft.enemy.hp },
+            winner: myId
+          });
+        } catch {}
+        setLockUI(true);
+        return;
+      }
+      onUpdate({ ...draft });
       return;
     }
 
     // Fin de turno -> veneno
-    endTurnPoisonTick(state, who === "player" ? state.enemy : state.player);
+  endTurnPoisonTick(draft, who === "player" ? draft.enemy : draft.player);
 
     // Cambiar turno
-    state.turn = who === "player" ? "enemy" : "player";
-    onUpdate({ ...state });
+    draft.turn = who === "player" ? "enemy" : "player";
+
+    if (mode === 'online' && who === 'player' && roomId) {
+      const myId = state._ids?.player || youId;
+      const oppId = state._ids?.enemy || (players?.find(p => p.id !== myId)?.id);
+      try {
+        sendMove(roomId, moveId, {
+          log: draft.log.slice(0, 10),
+          hp: { [myId]: draft.player.hp, [oppId]: draft.enemy.hp },
+          winner: null
+        });
+      } catch {}
+      setLockUI(true);
+      return;
+    }
+
+    onUpdate({ ...draft });
 
     // Online: enviar jugada al servidor y NO usar IA
     if (mode === 'online' && who === 'player' && roomId) {
@@ -94,7 +134,13 @@ export default function BattleView({ state, onExit, onUpdate, mv, calcDamage, ty
   // En online: cuando el servidor avisa fin de batalla, salir al lobby
   useEffect(() => {
     if (mode !== 'online') return;
-    const handler = () => {
+    const handler = (payload) => {
+      if (!alertedRef.current) {
+        const myId = state._ids?.player || youId;
+        const msg = payload?.winner === myId ? '¡Has ganado!' : 'Has perdido.';
+        alertedRef.current = true;
+        try { window.alert(msg); } catch {}
+      }
       onExit && onExit();
     };
     onBattleEnded(handler);
@@ -104,21 +150,22 @@ export default function BattleView({ state, onExit, onUpdate, mv, calcDamage, ty
   useEffect(() => {
     if (mode !== 'online') return;
     const handler = (payload) => {
-      // Mapear turno del server ('p1'|'p2') a 'player'|'enemy'
-      const nextTurn = payload.turn === (state._ids?.player || youId) ? 'player' : 'enemy';
-      const next = { ...state };
+      const myId = state._ids?.player || youId;
+      const oppId = state._ids?.enemy || (players?.find(p => p.id !== myId)?.id);
+      const nextTurn = payload.turn === myId ? 'player' : 'enemy';
+      const next = { ...state, player: { ...state.player }, enemy: { ...state.enemy } };
       if (payload.log) next.log = payload.log;
       if (payload.hp) {
-        next.player.hp = payload.hp.playerHp ?? next.player.hp;
-        next.enemy.hp = payload.hp.enemyHp ?? next.enemy.hp;
+        if (payload.hp[myId] != null) next.player.hp = payload.hp[myId];
+        if (payload.hp[oppId] != null) next.enemy.hp = payload.hp[oppId];
       }
-      if (payload.winner) next.winner = payload.winner === (state._ids?.player || youId) ? 'player' : 'enemy';
+      if (payload.winner) next.winner = payload.winner === myId ? 'player' : 'enemy';
       next.turn = nextTurn;
       onUpdate(next);
       setLockUI(next.turn !== 'player');
     };
     onBattleUpdate(handler);
-  }, [mode, state, youId, onUpdate]);
+  }, [mode, state, youId, players, onUpdate]);
 
   // En online: cuando detectamos un ganador, avisar al servidor
   useEffect(() => {
@@ -126,6 +173,14 @@ export default function BattleView({ state, onExit, onUpdate, mv, calcDamage, ty
       endBattle(roomId, state.winner, 'client-finished');
     }
   }, [mode, roomId, state.winner]);
+
+  // Alerta local cuando se detecta ganador en el estado
+  useEffect(() => {
+    if (!state?.winner || alertedRef.current) return;
+    alertedRef.current = true;
+    const msg = state.winner === 'player' ? '¡Has ganado!' : 'Has perdido.';
+    try { window.alert(msg); } catch {}
+  }, [state.winner]);
 
   return (
     <div className="relative">
