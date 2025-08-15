@@ -92,7 +92,15 @@ io.on('connection', (socket) => {
       const [p1, p2] = room.players;
       room.turn = 'p1';
       room.battle = { player: { id: p1.id, hp: null }, enemy: { id: p2.id, hp: null }, log: ['¡Comienza el combate online!'] };
-      io.to(roomId).emit('battle:start');
+      // Emit start to each player with personalized youId
+      room.players.forEach(pl => {
+        io.to(pl.sid).emit('battle:start', {
+          players: room.players.map(({ id, name, slimeId, sid }) => ({ id, name, slimeId, sid })),
+          turn: room.turn,
+          youId: pl.id,
+          roomId
+        });
+      });
     }
     emitRoomState(roomId);
   });
@@ -102,8 +110,17 @@ io.on('connection', (socket) => {
     if (!room || !room.battle) return;
     // Authoritative turn switch on server
     room.battle.log = statePatch?.log || room.battle.log;
+    const actor = room.players.find(x => x.sid === socket.id);
+    const from = actor ? actor.id : null;
     room.turn = room.turn === 'p1' ? 'p2' : 'p1';
-    io.to(roomId).emit('battle:update', { turn: room.turn, log: room.battle.log });
+    io.to(roomId).emit('battle:update', {
+      turn: room.turn,
+      log: room.battle.log,
+      moveId,
+      from,
+      hp: statePatch?.hp || null,
+      winner: statePatch?.winner || null
+    });
   });
 
   socket.on('battle:end', ({ roomId, winner, reason }) => {

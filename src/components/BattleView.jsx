@@ -3,9 +3,9 @@ import { motion } from "framer-motion";
 import Img from "./common/Img";
 import Panel from "./common/Panel";
 import HudBar from "./HudBar";
-import { onChatMessage, sendChat, onBattleEnded, endBattle } from "../online/socket";
+import { onChatMessage, sendChat, onBattleEnded, endBattle, onBattleUpdate, sendMove } from "../online/socket";
 
-export default function BattleView({ state, onExit, onUpdate, mv, calcDamage, typeMultiplier, applyEffect, endTurnPoisonTick, mode = 'local', roomId, playerName }) {
+export default function BattleView({ state, onExit, onUpdate, mv, calcDamage, typeMultiplier, applyEffect, endTurnPoisonTick, mode = 'local', roomId, playerName, youId, players }) {
   const [lockUI, setLockUI] = useState(false);
   const [chat, setChat] = useState([]);
   const chatBoxRef = React.useRef(null);
@@ -48,8 +48,21 @@ export default function BattleView({ state, onExit, onUpdate, mv, calcDamage, ty
     state.turn = who === "player" ? "enemy" : "player";
     onUpdate({ ...state });
 
-    // Si le toca a la IA, actuar
-    if (state.turn === "enemy") {
+    // Online: enviar jugada al servidor y NO usar IA
+    if (mode === 'online' && who === 'player' && roomId) {
+      try {
+        sendMove(roomId, moveId, {
+          log: state.log.slice(0, 10),
+          hp: { playerHp: state.player.hp, enemyHp: state.enemy.hp },
+          winner: state.winner || null
+        });
+      } catch {}
+      setLockUI(true);
+      return;
+    }
+
+    // Local: si le toca a la IA, actuar
+    if (mode !== 'online' && state.turn === "enemy") {
       setLockUI(true);
       await new Promise((r) => setTimeout(r, 650));
       const choice = other.slime.moves[Math.floor(Math.random() * other.slime.moves.length)];
@@ -58,9 +71,9 @@ export default function BattleView({ state, onExit, onUpdate, mv, calcDamage, ty
     }
   };
 
-  // Auto turno inicial si es enemigo
+  // Auto turno inicial (solo local); en online esperamos al rival
   useEffect(() => {
-    if (state.turn === "enemy" && !state.winner) {
+    if (mode !== 'online' && state.turn === "enemy" && !state.winner) {
       const choice = state.enemy.slime.moves[Math.floor(Math.random() * state.enemy.slime.moves.length)];
       setTimeout(() => doMove("enemy", choice), 600);
     }
@@ -86,6 +99,26 @@ export default function BattleView({ state, onExit, onUpdate, mv, calcDamage, ty
     };
     onBattleEnded(handler);
   }, [mode, onExit]);
+
+  // En online: aplicar actualizaciones del rival (y desbloquear UI si vuelve nuestro turno)
+  useEffect(() => {
+    if (mode !== 'online') return;
+    const handler = (payload) => {
+      // Mapear turno del server ('p1'|'p2') a 'player'|'enemy'
+      const nextTurn = payload.turn === (state._ids?.player || youId) ? 'player' : 'enemy';
+      const next = { ...state };
+      if (payload.log) next.log = payload.log;
+      if (payload.hp) {
+        next.player.hp = payload.hp.playerHp ?? next.player.hp;
+        next.enemy.hp = payload.hp.enemyHp ?? next.enemy.hp;
+      }
+      if (payload.winner) next.winner = payload.winner === (state._ids?.player || youId) ? 'player' : 'enemy';
+      next.turn = nextTurn;
+      onUpdate(next);
+      setLockUI(next.turn !== 'player');
+    };
+    onBattleUpdate(handler);
+  }, [mode, state, youId, onUpdate]);
 
   // En online: cuando detectamos un ganador, avisar al servidor
   useEffect(() => {

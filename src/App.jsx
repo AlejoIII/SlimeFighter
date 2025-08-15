@@ -74,13 +74,21 @@ export default function App() {
     setScreen("battle");
   };
 
-  const [onlineCtx, setOnlineCtx] = useState({ roomId: null, name: null });
-  const onStartOnlineBattle = ({ roomId, name }) => {
-    // En el MVP sólo navega a batalla; el estado será controlado por el servidor vía OnlineLobby
+  const [onlineCtx, setOnlineCtx] = useState({ roomId: null, name: null, youId: null, players: null });
+  const onStartOnlineBattle = ({ roomId, name, payload }) => {
+    // Construir batalla online real con los slimes seleccionados
     setMode('online');
-    setOnlineCtx({ roomId, name });
-    // Por ahora reutilizamos el flujo local para tener una batalla visible
-    startBattle();
+    const you = payload.players.find(p => p.id === payload.youId);
+    const other = payload.players.find(p => p.id !== payload.youId);
+    const yourSlime = pick(you.slimeId) || pick('normal');
+    const otherSlime = pick(other.slimeId) || pick('normal');
+    const player = { slime: yourSlime, hp: yourSlime.stats.hp, status: null };
+    const enemy = { slime: otherSlime, hp: otherSlime.stats.hp, status: null };
+    const bg = (ASSETS.bgs[Math.floor(Math.random() * ASSETS.bgs.length)] || {}).src || PLACEHOLDER_BG;
+    const initialTurn = payload.turn === payload.youId ? 'player' : 'enemy';
+    setBattle({ player, enemy, turn: initialTurn, bg, log: ["¡Comienza el combate online!"], winner: null, _ids: { player: you.id, enemy: other.id } });
+    setOnlineCtx({ roomId, name, youId: payload.youId, players: payload.players });
+    setScreen('battle');
   };
 
   return (
@@ -114,6 +122,8 @@ export default function App() {
               mode={mode}
               roomId={onlineCtx.roomId}
               playerName={onlineCtx.name}
+              youId={onlineCtx.youId}
+              players={onlineCtx.players}
             />
           )}
         </AnimatePresence>

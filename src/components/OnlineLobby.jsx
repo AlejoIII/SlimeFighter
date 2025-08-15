@@ -23,7 +23,7 @@ export default function OnlineLobby({ serverUrl, onStartBattle }) {
     s.on("connect", () => setConnected(true));
 
     const handleRoomState = (st) => setRoomState(st);
-    const handleBattleStart = () => onStartBattle({ roomId: roomIdRef.current, name: nameRef.current });
+  const handleBattleStart = (payload) => onStartBattle({ roomId: roomIdRef.current, name: nameRef.current, payload });
     const handleRoomList = (list) => setRooms(list);
 
     s.off && s.off("room:state", handleRoomState);
