@@ -5,6 +5,9 @@ import { Server } from 'socket.io';
 
 const app = express();
 app.use(cors());
+// Health endpoints
+app.get('/', (req, res) => res.send('SlimeFighter server OK'));
+app.get('/healthz', (req, res) => res.json({ ok: true }));
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
