@@ -4,7 +4,7 @@ import { connect, createRoom, joinRoom, selectSlime, playerReady, leaveRoom } fr
 import { SLIMES } from "../game/data";
 import Img from "./common/Img";
 
-export default function OnlineLobby({ serverUrl = "http://localhost:3001", onStartBattle }) {
+export default function OnlineLobby({ serverUrl, onStartBattle }) {
   const [roomId, setRoomId] = useState("");
   const [name, setName] = useState("");
   const [connected, setConnected] = useState(false);
