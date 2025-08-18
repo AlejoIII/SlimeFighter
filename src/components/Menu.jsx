@@ -8,8 +8,8 @@ export default function Menu({ assets, onStart, onStartOnline }) {
     <motion.div key="menu" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="grid md:grid-cols-2 gap-6 items-center">
       <Img alt="logo" src={assets.logo} className="w-72 md:w-96 drop-shadow-2xl mx-auto" />
       <Panel>
-        <h1 className="text-3xl md:text-4xl font-extrabold">Slime Tactics</h1>
-        <p className="opacity-80 mt-2">Combate por turnos al estilo monster-tamer pero con slimes. 📦</p>
+        <h1 className="text-3xl md:text-4xl font-extrabold">SlimeFighters</h1>
+        <p className="opacity-80 mt-2">Combate por turnos al estilo Pokemon, pero con slimes.</p>
         <div className="mt-6 flex flex-wrap gap-3">
           <button className="px-5 py-2 rounded-xl bg-emerald-600 text-white shadow hover:scale-[1.02] transition" onClick={onStart}>
             Jugar
