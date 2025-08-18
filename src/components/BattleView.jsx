@@ -12,21 +12,28 @@ export default function BattleView({ state, onExit, onUpdate, mv, calcDamage, ty
   const [chatText, setChatText] = useState("");
   const alertedRef = React.useRef(false);
 
-  const doMove = async (who, moveId) => {
-    if (state.winner || lockUI) return;
-    if (mode === 'online' && state.turn !== 'player') return; // solo en tu turno
-    const me = who === "player" ? state.player : state.enemy;
-    const other = who === "player" ? state.enemy : state.player;
+  const handleBack = () => {
+    const ok = window.confirm('¿Seguro que quieres salir del combate?');
+    if (ok) onExit && onExit();
+  };
+
+  const doMove = async (who, moveId, baseState) => {
+    const s = baseState || state;
+    if (s.winner) return;
+    if (who === 'player' && lockUI) return; // no bloquees a la IA con el lock de UI
+    if (mode === 'online' && s.turn !== 'player') return; // solo en tu turno (online)
+    const me = who === "player" ? s.player : s.enemy;
+    const other = who === "player" ? s.enemy : s.player;
 
     const move = mv(moveId);
     if (!move) return;
     // Precisión
     // Trabajar sobre un borrador para no mutar estado prematuramente en online
     const draft = {
-      ...state,
-      player: { ...state.player },
-      enemy: { ...state.enemy },
-      log: [...state.log]
+      ...s,
+      player: { ...s.player },
+      enemy: { ...s.enemy },
+      log: [...(s.log || [])]
     };
     const dMe = who === 'player' ? draft.player : draft.enemy;
     const dOther = who === 'player' ? draft.enemy : draft.player;
@@ -66,47 +73,37 @@ export default function BattleView({ state, onExit, onUpdate, mv, calcDamage, ty
       return;
     }
 
-    // Fin de turno -> veneno
+  // Fin de turno -> veneno
   endTurnPoisonTick(draft, who === "player" ? draft.enemy : draft.player);
 
     // Cambiar turno
     draft.turn = who === "player" ? "enemy" : "player";
 
     if (mode === 'online' && who === 'player' && roomId) {
-      const myId = state._ids?.player || youId;
-      const oppId = state._ids?.enemy || (players?.find(p => p.id !== myId)?.id);
+  const myId = s._ids?.player || youId;
+  const oppId = s._ids?.enemy || (players?.find(p => p.id !== myId)?.id);
       try {
         sendMove(roomId, moveId, {
           log: draft.log.slice(0, 10),
           hp: { [myId]: draft.player.hp, [oppId]: draft.enemy.hp },
-          winner: null
+          winner: null,
+          turn: oppId
         });
       } catch {}
       setLockUI(true);
       return;
     }
 
+    // Aplicar estado local inmediatamente
     onUpdate({ ...draft });
 
-    // Online: enviar jugada al servidor y NO usar IA
-    if (mode === 'online' && who === 'player' && roomId) {
-      try {
-        sendMove(roomId, moveId, {
-          log: state.log.slice(0, 10),
-          hp: { playerHp: state.player.hp, enemyHp: state.enemy.hp },
-          winner: state.winner || null
-        });
-      } catch {}
-      setLockUI(true);
-      return;
-    }
-
-    // Local: si le toca a la IA, actuar
-    if (mode !== 'online' && state.turn === "enemy") {
+    // Local: si le toca a la IA tras esta jugada, que actúe
+    if (mode !== 'online' && draft.turn === "enemy") {
       setLockUI(true);
       await new Promise((r) => setTimeout(r, 650));
-      const choice = other.slime.moves[Math.floor(Math.random() * other.slime.moves.length)];
-      await doMove("enemy", choice);
+      const aiMoves = (draft.enemy?.slime?.moves || other.slime.moves);
+      const choice = aiMoves[Math.floor(Math.random() * aiMoves.length)];
+      await doMove("enemy", choice, draft);
       setLockUI(false);
     }
   };
@@ -150,8 +147,8 @@ export default function BattleView({ state, onExit, onUpdate, mv, calcDamage, ty
   useEffect(() => {
     if (mode !== 'online') return;
     const handler = (payload) => {
-      const myId = state._ids?.player || youId;
-      const oppId = state._ids?.enemy || (players?.find(p => p.id !== myId)?.id);
+  const myId = state._ids?.player || youId;
+  const oppId = state._ids?.enemy || (players?.find(p => p.id !== myId)?.id);
       const nextTurn = payload.turn === myId ? 'player' : 'enemy';
       const next = { ...state, player: { ...state.player }, enemy: { ...state.enemy } };
       if (payload.log) next.log = payload.log;
@@ -185,38 +182,45 @@ export default function BattleView({ state, onExit, onUpdate, mv, calcDamage, ty
   return (
     <div className="relative">
       <div className="relative rounded-3xl overflow-hidden shadow-2xl border">
+        {/* Botón de volver (arriba izquierda) */}
+        <button
+          onClick={handleBack}
+          aria-label="Volver"
+          title="Volver"
+          className="absolute top-3 left-3 z-30 rounded-full border bg-white/80 dark:bg-zinc-900/80 backdrop-blur p-2 hover:bg-white/90 dark:hover:bg-zinc-900/90 shadow"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+            <path fillRule="evenodd" d="M9.53 4.47a.75.75 0 010 1.06L5.81 9.25H20a.75.75 0 010 1.5H5.81l3.72 3.72a.75.75 0 11-1.06 1.06l-5-5a.75.75 0 010-1.06l5-5a.75.75 0 011.06 0z" clipRule="evenodd" />
+          </svg>
+        </button>
         <Img src={state.bg} alt="bg" className="w-full h-72 md:h-96 object-cover" kind="bg" />
         {/* HUD superior (enemigo) */}
         <div className="absolute top-4 right-4 z-20">
           <HudBar name={state.enemy.slime.name} hp={state.enemy.hp} max={state.enemy.slime.stats.hp} status={state.enemy.status} side="right" />
         </div>
         {/* Enemigo */}
-        <motion.div initial={{ x: 120, opacity: 0 }} animate={{ x: 0, opacity: 1 }} className="absolute right-8 bottom-10 sm:bottom-14 md:bottom-20 z-10">
+        <motion.div initial={{ x: 120, opacity: 0 }} animate={{ x: 0, opacity: 1 }} className="absolute right-8 bottom-10 sm:bottom-14 md:bottom-18 z-10">
           <Img src={state.enemy.slime.sprite} alt={state.enemy.slime.name} className="w-40 md:w-56 max-h-36 sm:max-h-40 md:max-h-56 object-contain drop-shadow-xl" />
         </motion.div>
 
-        {/* HUD inferior (jugador) */}
-  <div className="absolute left-4 bottom-48 sm:bottom-56 md:bottom-64 z-20">
+  {/* HUD inferior (jugador) */}
+  <div className="absolute left-4 bottom-36 sm:bottom-40 md:bottom-56 z-20">
           <HudBar name={state.player.slime.name} hp={state.player.hp} max={state.player.slime.stats.hp} status={state.player.status} side="left" />
         </div>
         {/* Jugador */}
-        <motion.div initial={{ x: -120, opacity: 0 }} animate={{ x: 0, opacity: 1 }} className="absolute left-8 bottom-10 sm:bottom-14 md:bottom-20 z-10">
+  <motion.div initial={{ x: -120, opacity: 0 }} animate={{ x: 0, opacity: 1 }} className="absolute left-8 bottom-6 sm:bottom-8 md:bottom-0 z-10">
           <Img src={state.player.slime.sprite} alt={state.player.slime.name} className="w-40 md:w-56 max-h-36 sm:max-h-40 md:max-h-56 object-contain drop-shadow-xl" />
         </motion.div>
       </div>
 
   {/* Panel inferior: log + acciones (+ chat en online) */}
   <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4 items-stretch">
-        <Panel title={state.winner ? (state.winner === "player" ? "¡Victoria!" : "Derrota") : "Registro"}>
+  <Panel title={state.winner ? (state.winner === "player" ? "¡Victoria!" : "Derrota") : "Registro"}>
           <ul className="text-sm space-y-1 min-h-[4rem]">
             {state.log.slice(0, 5).map((l, i) => (
               <li key={i} className="opacity-90">• {l}</li>
             ))}
           </ul>
-          <div className="mt-3 flex gap-2">
-            <button className="px-4 py-2 rounded-xl bg-zinc-200 dark:bg-zinc-700" onClick={onExit}>Salir</button>
-            <button className="px-4 py-2 rounded-xl bg-emerald-600 text-white" onClick={() => window.location.reload()}>Reiniciar</button>
-          </div>
         </Panel>
 
         <Panel title="Acciones">
