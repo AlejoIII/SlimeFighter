@@ -177,6 +177,10 @@ export default function BattleView({ state, onExit, onUpdate, mv, calcDamage, ty
     alertedRef.current = true;
     const msg = state.winner === 'player' ? '¡Has ganado!' : 'Has perdido.';
     try { window.alert(msg); } catch {}
+    // En local: volver automáticamente a selección tras el mensaje
+    if (mode !== 'online') {
+      onExit && onExit();
+    }
   }, [state.winner]);
 
   return (

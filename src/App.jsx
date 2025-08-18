@@ -112,7 +112,7 @@ export default function App() {
             <BattleView
               key="battle-screen"
               state={battle}
-              onExit={() => setScreen(mode === 'online' ? 'online' : 'menu')}
+              onExit={() => setScreen(mode === 'online' ? 'online' : 'select')}
               onUpdate={setBattle}
               mv={(id) => MOVES.find((m) => m.id === id)}
               calcDamage={calcDamage}
