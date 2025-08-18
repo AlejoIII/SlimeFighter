@@ -127,10 +127,12 @@ io.on('connection', (socket) => {
     const room = rooms.get(roomId);
     if (!room) return;
     io.to(roomId).emit('battle:ended', { winner, reason });
-    // reset room to lobby
-    if (room.battle) room.battle = null;
-    room.players.forEach(p => { p.ready = false; });
-    emitRoomState(roomId);
+  // reset room to lobby (keep same players)
+  if (room.battle) room.battle = null;
+  room.turn = 'p1';
+  room.players.forEach(p => { p.ready = false; p.slimeId = null; p.hp = null; p.status = null; });
+  emitRoomState(roomId);
+  io.emit('room:list', roomSummary());
   });
 
   socket.on('chat:send', ({ roomId, name, text }) => {
@@ -163,6 +165,20 @@ io.on('connection', (socket) => {
       }
     }
   io.emit('room:list', roomSummary());
+  });
+
+  // Allow client to request current room state(s) after remounting lobby
+  socket.on('room:state:pull', () => {
+    for (const [roomId, room] of rooms.entries()) {
+      const isMember = room.players.some(p => p.sid === socket.id);
+      if (isMember) {
+        socket.emit('room:state', {
+          players: room.players.map(p => ({ id: p.id, sid: p.sid, name: p.name, slimeId: p.slimeId || null, ready: !!p.ready })),
+          turn: room.turn,
+          battle: room.battle ? { ...room.battle, log: room.battle.log?.slice(0, 10) } : null
+        });
+      }
+    }
   });
 });
 

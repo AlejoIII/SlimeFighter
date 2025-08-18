@@ -11,6 +11,7 @@ export default function OnlineLobby({ serverUrl, onStartBattle }) {
   const [roomState, setRoomState] = useState(null);
   const [selected, setSelected] = useState(null);
   const [rooms, setRooms] = useState([]);
+  const [joinedRoomId, setJoinedRoomId] = useState("");
   const inRoom = !!roomState; // recibes room:state solo si estás dentro
 
   const roomIdRef = useRef("");
@@ -34,8 +35,10 @@ export default function OnlineLobby({ serverUrl, onStartBattle }) {
     s.on("room:list", handleRoomList);
 
     s.emit("room:list");
+  // request any room state if we're still in a room (after battle end we return to lobby)
+  try { s.emit('room:state:pull'); } catch {}
 
-    return () => {
+  return () => {
       s.off && s.off("room:state", handleRoomState);
       s.off && s.off("battle:start", handleBattleStart);
       s.off && s.off("room:list", handleRoomList);
@@ -45,10 +48,12 @@ export default function OnlineLobby({ serverUrl, onStartBattle }) {
   const handleCreate = () => {
     if (!roomId || !name) return;
     createRoom(roomId, name);
+  setJoinedRoomId(roomId);
   };
   const handleJoin = () => {
     if (!roomId || !name) return;
     joinRoom(roomId, name);
+  setJoinedRoomId(roomId);
   };
 
   const handleSelect = (id) => {
@@ -117,7 +122,18 @@ export default function OnlineLobby({ serverUrl, onStartBattle }) {
         </div>
         <div className="mt-3 flex gap-2 items-center">
           <button className="px-4 py-2 rounded-xl bg-emerald-600 text-white" onClick={handleReady} disabled={!selected}>Estoy listo</button>
-          <button className="px-4 py-2 rounded-xl bg-zinc-200 dark:bg-zinc-700" onClick={() => { if (roomId) { leaveRoom(roomId); setRoomState(null); } }}>Salir de la sala</button>
+          <button
+            className="px-4 py-2 rounded-xl bg-zinc-200 dark:bg-zinc-700"
+            onClick={() => {
+              const rid = joinedRoomId || roomId;
+              if (rid) {
+                leaveRoom(rid);
+                setRoomState(null);
+                setSelected(null);
+                setJoinedRoomId("");
+              }
+            }}
+          >Salir de la sala</button>
           <div className="text-xs opacity-70">Comparte el Room ID "{roomId}" para que otro jugador se una.</div>
         </div>
       </Panel>
