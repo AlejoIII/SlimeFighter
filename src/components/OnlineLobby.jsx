@@ -4,7 +4,7 @@ import { connect, createRoom, joinRoom, selectSlime, playerReady, leaveRoom } fr
 import { SLIMES } from "../game/data";
 import Img from "./common/Img";
 
-export default function OnlineLobby({ serverUrl, onStartBattle }) {
+export default function OnlineLobby({ serverUrl, onStartBattle, onBack }) {
   const [roomId, setRoomId] = useState("");
   const [name, setName] = useState("");
   const [connected, setConnected] = useState(false);
@@ -68,8 +68,23 @@ export default function OnlineLobby({ serverUrl, onStartBattle }) {
   // Chat se mueve a la partida (BattleView) según requerimiento
 
   return (
-    <div className="space-y-4">
-      <Panel title="Jugar Online">
+    <div className="space-y-4 relative pt-12">
+      {/* Botón de volver (arriba izquierda) */}
+      <button
+        onClick={() => {
+          const rid = joinedRoomId || roomId;
+          if (rid) leaveRoom(rid);
+          onBack && onBack();
+        }}
+        aria-label="Volver"
+        title="Volver"
+        className="absolute top-2 left-2 z-10 rounded-full border bg-white/80 dark:bg-zinc-900/80 backdrop-blur p-2 hover:bg-white/90 dark:hover:bg-zinc-900/90 shadow"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+          <path fillRule="evenodd" d="M9.53 4.47a.75.75 0 010 1.06L5.81 9.25H20a.75.75 0 010 1.5H5.81l3.72 3.72a.75.75 0 11-1.06 1.06l-5-5a.75.75 0 010-1.06l5-5a.75.75 0 011.06 0z" clipRule="evenodd" />
+        </svg>
+      </button>
+  <Panel title="Jugar Online">
         <div className="grid gap-3 sm:grid-cols-3 items-end">
           <div>
             <label className="text-sm">Room ID</label>

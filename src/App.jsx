@@ -97,7 +97,7 @@ export default function App() {
         <AnimatePresence mode="wait">
           {screen === "menu" && <Menu key="menu-screen" assets={ASSETS} onStart={() => { setMode('local'); setScreen("select"); }} onStartOnline={() => { setMode('online'); setScreen('online'); }} />}
           {screen === 'online' && (
-            <OnlineLobby key="online-screen" onStartBattle={onStartOnlineBattle} />
+            <OnlineLobby key="online-screen" onStartBattle={onStartOnlineBattle} onBack={() => setScreen('menu')} />
           )}
           {screen === "select" && (
             <SelectSlime key="select-screen"
